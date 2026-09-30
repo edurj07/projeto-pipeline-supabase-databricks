@@ -292,7 +292,7 @@ A IA foi tratada como uma **ferramenta de produtividade**, não como substituto 
 
 ## 👤 Autor
 
-**Eduardo R. J.**
+**Eduardo Ramiro**
 - Linkedin: https://www.linkedin.com/in/eduardo-ramiro/
 - GitHub: https://github.com/edurj07
 

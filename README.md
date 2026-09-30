@@ -209,6 +209,7 @@ projetovendas/
 | **Supabase (PostgreSQL)** | Fonte de dados transacional |
 | **Python (PySpark)** | Transformações silver |
 | **SQL** | Transformações gold e queries de dashboards |
+| **Databricks Assistant (IA)** | Assistente de IA para desenvolvimento, debugging e automação |
 
 ---
 
@@ -257,12 +258,34 @@ w.jobs.run_now(job_id=116445174849570)
 
 ---
 
+## 🤖 Uso de IA no Projeto
+
+O **Databricks Assistant** foi utilizado como ferramenta de desenvolvimento ao longo de todo o projeto, atuando como um par de programação inteligente — assim como Git, Databricks CLI ou SDK são ferramentas que ampliam a produtividade do engenheiro.
+
+### Como a IA foi utilizada
+
+| Etapa | Descrição |
+| --- | --- |
+| **Desenvolvimento de código** | Geração e refinamento de transformações silver (Python/PySpark) e gold (SQL), incluindo materialized views com tipos explícitos, comentários e regras de qualidade `@dp.expect` |
+| **Debugging e correção** | Diagnóstico e correção de erros de schema (ROW_NUMBER retornando INT ao invés de BIGINT), incompatibilidades de tipo em DataFrames, e falhas de validação do pipeline SDP |
+| **Automação de dashboards** | Criação do notebook de refresh que usa o Databricks SDK para invalidar cache e republicar dashboards — solução desenvolvida após identificar que a republicação manual não atualizava os dados publicados |
+| **Criação de widgets** | Posicionamento e configuração de KPIs, gráficos (bar, pie, line), tabelas e filtros globais nos 3 dashboards AI/BI via API do Lakeview |
+| **Orquestração de jobs** | Configuração do job multi-task (pipeline → testes → refresh de dashboards) e adição da task de automação |
+| **Testes de qualidade** | Escrita de testes automatizados validando números de referência, segmentação de clientes, métricas de pricing e cobertura de schema |
+| **Documentação** | Geração do README.md profissional, atualização do CLAUDE.md com convenções e números de referência |
+| **Publicação no GitHub** | Inicialização do repositório Git, commit de arquivos e push via integração Git do Databricks |
+
+### Filosofia de uso
+
+A IA foi tratada como uma **ferramenta de produtividade**, não como substituto do engenheiro. Todas as decisões de arquitetura, regras de negócio, convenções de nomenclatura e critérios de qualidade foram definidas pelo desenvolvedor. A IA acelerou a implementação, mas o entendimento do domínio e a validação dos resultados foram humanos.
+
+---
+
 ## 👤 Autor
 
 **Eduardo R. J.**
 - Databricks Data Engineer
-- LinkedIn: https://www.linkedin.com/in/eduardo-ramiro/
-- GitHub: https://github.com/edurj07
+- GitHub: [github.com/edurj07](https://github.com/edurj07)
 
 ---
 

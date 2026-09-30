@@ -1,0 +1,629 @@
+{
+  "datasets": [
+    {
+      "name": "kpis_pricing",
+      "displayName": "KPIs de Pricing",
+      "queryLines": [
+        "-- refresh 2026-09-30 00:31:50 UTC\n",
+        "SELECT\n",
+        "  COUNT(*) AS total_produtos,\n",
+        "  SUM(\n",
+        "    CASE\n",
+        "      WHEN classificacao_preco = 'MAIS_CARO_QUE_TODOS' THEN 1\n",
+        "      ELSE 0\n",
+        "    END\n",
+        "  ) AS mais_caros,\n",
+        "  SUM(\n",
+        "    CASE\n",
+        "      WHEN classificacao_preco = 'MAIS_BARATO_QUE_TODOS' THEN 1\n",
+        "      ELSE 0\n",
+        "    END\n",
+        "  ) AS mais_baratos,\n",
+        "  SUM(\n",
+        "    CASE\n",
+        "      WHEN possui_preco_suspeito = true THEN 1\n",
+        "      ELSE 0\n",
+        "    END\n",
+        "  ) AS com_suspeito,\n",
+        "  ROUND(AVG(diferenca_pct_vs_media), 2) AS diferenca_media_pct\n",
+        "FROM\n",
+        "  projetovendas.gold.precos_competitividade"
+      ]
+    },
+    {
+      "name": "precos_dados",
+      "displayName": "Preços e Competitividade",
+      "queryLines": [
+        "-- refresh 2026-09-30 00:31:50 UTC\n",
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  projetovendas.gold.precos_competitividade"
+      ]
+    },
+    {
+      "name": "suspeitos",
+      "displayName": "Produtos com Preço Suspeito",
+      "queryLines": [
+        "-- refresh 2026-09-30 00:31:50 UTC\n",
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  projetovendas.gold.precos_competitividade\n",
+        "WHERE\n",
+        "  possui_preco_suspeito = true\n",
+        "ORDER BY\n",
+        "  diferenca_pct_vs_media DESC"
+      ]
+    },
+    {
+      "name": "mais_caros",
+      "displayName": "Top 20 Mais Caros que Concorrentes",
+      "queryLines": [
+        "-- refresh 2026-09-30 00:31:50 UTC\n",
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  projetovendas.gold.precos_competitividade\n",
+        "WHERE\n",
+        "  classificacao_preco = 'MAIS_CARO_QUE_TODOS'\n",
+        "ORDER BY\n",
+        "  diferenca_pct_vs_media DESC\n",
+        "LIMIT 20"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "5524a7db",
+      "displayName": "Page 1",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_total",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpis_pricing",
+                  "fields": [
+                    {
+                      "name": "sum(total_produtos)",
+                      "expression": "SUM(`total_produtos`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Produtos Analisados"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_produtos)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_caros",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpis_pricing",
+                  "fields": [
+                    {
+                      "name": "sum(mais_caros)",
+                      "expression": "SUM(`mais_caros`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Mais Caros que Todos"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(mais_caros)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_baratos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpis_pricing",
+                  "fields": [
+                    {
+                      "name": "sum(mais_baratos)",
+                      "expression": "SUM(`mais_baratos`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Mais Baratos que Todos"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(mais_baratos)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_suspeitos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpis_pricing",
+                  "fields": [
+                    {
+                      "name": "sum(com_suspeito)",
+                      "expression": "SUM(`com_suspeito`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Preço Suspeito"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(com_suspeito)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_categoria_diff",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "precos_dados",
+                  "fields": [
+                    {
+                      "name": "categoria",
+                      "expression": "`categoria`"
+                    },
+                    {
+                      "name": "avg(diferenca_pct_vs_media)",
+                      "expression": "AVG(`diferenca_pct_vs_media`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Diferença % vs Média por Categoria"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "categoria",
+                  "displayName": "categoria",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(diferenca_pct_vs_media)",
+                  "displayName": "diferenca_pct_vs_media",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "categoria",
+                  "displayName": "categoria",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 8,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "table_mais_caros",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mais_caros",
+                  "fields": [
+                    {
+                      "name": "nome_produto",
+                      "expression": "`nome_produto`"
+                    },
+                    {
+                      "name": "categoria",
+                      "expression": "`categoria`"
+                    },
+                    {
+                      "name": "marca",
+                      "expression": "`marca`"
+                    },
+                    {
+                      "name": "nosso_preco",
+                      "expression": "`nosso_preco`"
+                    },
+                    {
+                      "name": "preco_medio_concorrentes",
+                      "expression": "`preco_medio_concorrentes`"
+                    },
+                    {
+                      "name": "preco_maximo_concorrentes",
+                      "expression": "`preco_maximo_concorrentes`"
+                    },
+                    {
+                      "name": "diferenca_pct_vs_media",
+                      "expression": "`diferenca_pct_vs_media`"
+                    },
+                    {
+                      "name": "diferenca_pct_vs_minimo",
+                      "expression": "`diferenca_pct_vs_minimo`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Top 20 Mais Caros que Concorrentes"
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "nome_produto"
+                  },
+                  {
+                    "fieldName": "categoria"
+                  },
+                  {
+                    "fieldName": "marca"
+                  },
+                  {
+                    "fieldName": "nosso_preco"
+                  },
+                  {
+                    "fieldName": "preco_medio_concorrentes"
+                  },
+                  {
+                    "fieldName": "preco_maximo_concorrentes"
+                  },
+                  {
+                    "fieldName": "diferenca_pct_vs_media"
+                  },
+                  {
+                    "fieldName": "diferenca_pct_vs_minimo"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 16,
+            "width": 12,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "table_suspeitos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "suspeitos",
+                  "fields": [
+                    {
+                      "name": "nome_produto",
+                      "expression": "`nome_produto`"
+                    },
+                    {
+                      "name": "categoria",
+                      "expression": "`categoria`"
+                    },
+                    {
+                      "name": "nosso_preco",
+                      "expression": "`nosso_preco`"
+                    },
+                    {
+                      "name": "preco_medio_concorrentes",
+                      "expression": "`preco_medio_concorrentes`"
+                    },
+                    {
+                      "name": "total_concorrentes",
+                      "expression": "`total_concorrentes`"
+                    },
+                    {
+                      "name": "classificacao_preco",
+                      "expression": "`classificacao_preco`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Produtos com Preço Suspeito",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "nome_produto"
+                  },
+                  {
+                    "fieldName": "categoria"
+                  },
+                  {
+                    "fieldName": "nosso_preco"
+                  },
+                  {
+                    "fieldName": "preco_medio_concorrentes"
+                  },
+                  {
+                    "fieldName": "total_concorrentes"
+                  },
+                  {
+                    "fieldName": "classificacao_preco"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 24,
+            "width": 12,
+            "height": 9
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_classif_categoria",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "precos_dados",
+                  "fields": [
+                    {
+                      "name": "classificacao_preco",
+                      "expression": "`classificacao_preco`"
+                    },
+                    {
+                      "name": "categoria",
+                      "expression": "`categoria`"
+                    },
+                    {
+                      "name": "count(classificacao_preco)",
+                      "expression": "COUNT(`classificacao_preco`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Produtos por Classificação em cada Categoria",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "categoria",
+                  "displayName": "categoria",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "count(classificacao_preco)",
+                  "displayName": "classificacao_preco",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "classificacao_preco",
+                  "displayName": "classificacao_preco",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 12,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "pie_classificacao",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "precos_dados",
+                  "fields": [
+                    {
+                      "name": "count(classificacao_preco)",
+                      "expression": "COUNT(`classificacao_preco`)"
+                    },
+                    {
+                      "name": "classificacao_preco",
+                      "expression": "`classificacao_preco`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Distribuição por Classificação"
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "count(classificacao_preco)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "classificacao_preco",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 4,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}

@@ -1,0 +1,44 @@
+bundle:
+  name: projetovendas
+
+variables:
+  catalogo:
+    description: "Catálogo Unity Catalog do projeto"
+    default: projetovendas
+
+resources:
+  pipelines:
+    pipeline_silver:
+      name: pipeline_silver_projetovendas
+      serverless: true
+      catalog: ${var.catalogo}
+      target: silver
+      libraries:
+        - file:
+            path: transformations/silver/produtos.py
+        - file:
+            path: transformations/silver/clientes.py
+        - file:
+            path: transformations/silver/preco_competidores.py
+        - file:
+            path: transformations/silver/vendas.py
+
+  jobs:
+    pipeline_ecommerce:
+      name: Pipeline E-commerce
+      tasks:
+        - task_key: rodar_pipeline
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.pipeline_silver.id}
+        - task_key: rodar_testes
+          depends_on:
+            - task_key: rodar_pipeline
+          notebook_task:
+            notebook_path: testes/testes_qualidade.py
+            base_parameters:
+              catalogo: ${var.catalogo}
+
+targets:
+  dev:
+    mode: development
+    default: true

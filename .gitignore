@@ -1,0 +1,60 @@
+# Databricks internals
+.assistant/
+.bundle/
+.conversations/
+.db_internal/
+Drafts/
+
+# Databricks artifacts
+*.dbc
+*.whl
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Ambientes virtuais
+venv/
+.venv/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Credenciais e secrets
+*.env
+*.key
+*.pem
+secrets.json
+
+# Logs
+*.log
+logs/
+
+# Dashboards antigos (duplicados com timestamp)
+*2026-09-29T16-55-04*
+
+# Arquivos auxiliares
+conexão com S3.ipynb
+query para testes.dbquery.ipynb
+
+# Notebooks duplicados
+atualizar_dashboards_nb (1).py
+refresh_dashboards_nb.py
+
+# Genie space
+*.geniespace.json
+
+# Pipeline temp
+pipeline_silver_projetovendas_cc20952e/

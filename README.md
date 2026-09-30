@@ -67,6 +67,255 @@ Os dados originais (vendas, clientes, produtos e preços de concorrentes) estão
 
 ---
 
+## 📦 Bronze — Ingestão de Dados (S3/Parquet)
+
+A camada bronze recebe os dados diretamente do Supabase (simulando AWS S3) em formato **Parquet**. O notebook `conexão com S3.ipynb` usa a biblioteca `boto3` para conectar ao endpoint S3-compatível do Supabase, baixar os arquivos Parquet, converter para DataFrames Spark e gravar como tabelas Delta no catálogo `projetovendas.bronze`.
+
+```python
+import boto3
+import io
+import pandas as pd
+
+# Conexão com Supabase S3 (simula AWS S3)
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=ACCESS_KEY,
+    aws_secret_access_key=SECRET_KEY,
+    region_name="us-west-2",
+    endpoint_url="https://<projeto>.storage.supabase.co/storage/v1/s3"
+)
+
+# Le o arquivo Parquet do bucket e grava como tabela Delta na bronze
+response = s3.get_object(Bucket="LakeDataEcommerce", Key="vendas.parquet")
+pdf = pd.read_parquet(io.BytesIO(response["Body"].read()))
+df = spark.createDataFrame(pdf)
+df.write.format("delta").mode("overwrite").saveAsTable("projetovendas.bronze.vendas")
+```
+
+O mesmo padrão é aplicado para as 4 tabelas da bronze: `vendas`, `clientes`, `produtos` e `preco_competidores`.
+
+---
+
+## 🥈 Silver — Transformações Python (SDP)
+
+A camada silver é implementada em **Python (PySpark)** usando o decorador `@dp.materialized_view` do Spark Declarative Pipelines. Cada arquivo define uma tabela silver com regras de qualidade `@dp.expect_all_or_fail` (fail) e `@dp.expect` (warn).
+
+### silver.produtos
+```python
+@dp.materialized_view(name="silver.produtos")
+@dp.expect_all_or_fail({
+    "id_produto_preenchido": "id_produto IS NOT NULL",
+    "preco_atual_positivo": "preco_atual > 0",
+})
+def produtos():
+    return (
+        spark.read.table("bronze.produtos")
+        .dropDuplicates(["id_produto"])
+        .withColumn("nome_produto", F.trim(F.col("nome_produto")))
+        .withColumn("preco_atual", F.col("preco_atual").cast(DecimalType(10, 2)))
+        .withColumn("faixa_preco",
+            F.when(F.col("preco_atual") > 1000, "PREMIUM")
+            .when(F.col("preco_atual") > 500, "MEDIO")
+            .otherwise("BASICO"))
+        .select("id_produto", "nome_produto", "categoria", "marca",
+                "preco_atual", "data_criacao", "faixa_preco")
+    )
+```
+
+### silver.clientes
+```python
+@dp.materialized_view(name="silver.clientes")
+@dp.expect_all_or_fail({
+    "id_cliente_preenchido": "id_cliente IS NOT NULL",
+    "regiao_preenchida": "regiao IS NOT NULL",
+})
+def clientes():
+    bronze = spark.read.table("bronze.clientes").dropDuplicates(["id_cliente"])
+    # Mapeamento das 27 UFs do IBGE para nome do estado e regiao
+    estados_df = spark.createDataFrame(
+        [(uf, nome, regiao) for uf, (nome, regiao) in ESTADOS_IBGE.items()],
+        ["estado", "nome_estado", "regiao"])
+    return (
+        bronze
+        .withColumn("nome_original", F.col("nome_cliente"))
+        .withColumn("nome_cliente",
+            F.initcap(F.trim(F.regexp_replace(F.col("nome_cliente"),
+                r"^(Sr\.|Sra\.|Srta\.|Dr\.|Dra\.)\s+", ""))))
+        .withColumn("estado", F.upper(F.col("estado")))
+        .join(estados_df, on="estado", how="left")
+        .select("id_cliente", "nome_original", "nome_cliente", "estado",
+                "nome_estado", "regiao", "pais", "data_cadastro")
+    )
+```
+
+### silver.vendas
+```python
+@dp.materialized_view(name="silver.vendas")
+@dp.expect_all_or_fail({
+    "id_venda_preenchido": "id_venda IS NOT NULL",
+    "quantidade_positiva": "quantidade > 0",
+    "preco_unitario_positivo": "preco_unitario > 0",
+    "canal_venda_valido": "canal_venda IN ('ecommerce', 'loja_fisica')",
+})
+@dp.expect("produto_cadastrado", "produto_cadastrado = true")
+def vendas():
+    produtos = spark.read.table("silver.produtos").select("id_produto", "data_criacao")
+    return (
+        spark.read.table("bronze.vendas")
+        .dropDuplicates(["id_venda"])
+        .withColumn("preco_unitario", F.col("preco_unitario").cast(DecimalType(10, 2)))
+        .withColumn("receita", (F.col("quantidade") * F.col("preco_unitario")).cast(DecimalType(10, 2)))
+        .withColumn("data", F.to_date(F.col("data_venda")))
+        .withColumn("hora", F.hour(F.col("data_venda")))
+        .withColumn("dia_semana_num", F.dayofweek(F.col("data_venda")))
+        .join(produtos, on="id_produto", how="left")
+        .withColumn("produto_cadastrado", F.col("data_criacao").isNotNull())
+        .select("id_venda", "data_venda", "data", "hora", "dia_semana_num",
+                "id_cliente", "id_produto", "canal_venda", "quantidade",
+                "preco_unitario", "receita", "produto_cadastrado")
+    )
+```
+
+### silver.preco_competidores
+```python
+@dp.materialized_view(name="silver.preco_competidores")
+@dp.expect_all_or_fail({
+    "id_produto_preenchido": "id_produto IS NOT NULL",
+    "preco_positivo": "preco_concorrente > 0",
+})
+@dp.expect("preco_plausivel", "NOT preco_suspeito")
+def preco_competidores():
+    produtos = spark.read.table("silver.produtos").select(
+        "id_produto", F.col("preco_atual").alias("preco_atual_produto"))
+    return (
+        spark.read.table("bronze.preco_competidores")
+        .dropDuplicates(["id_produto", "nome_concorrente"])
+        .withColumn("preco_concorrente", F.col("preco_concorrente").cast(DecimalType(10, 2)))
+        .withColumn("data_coleta", F.to_timestamp("data_coleta"))
+        .join(produtos, on="id_produto", how="left")
+        .withColumn("preco_suspeito",
+            F.col("preco_concorrente") < (F.col("preco_atual_produto") * 0.60))
+        .select("id_produto", "nome_concorrente", "preco_concorrente",
+                "data_coleta", "preco_suspeito")
+    )
+```
+
+---
+
+## 🥇 Gold — Queries SQL (Materialized Views)
+
+A camada gold é implementada em **SQL** usando `CREATE OR REFRESH MATERIALIZED VIEW`. Cada view agrega os dados da silver para análises de negócio, com comentários em todas as colunas e tipos explícitos (`DECIMAL(10,2)`, `BIGINT`, `INT`).
+
+### gold.vendas_temporais — Diretoria Comercial
+```sql
+CREATE OR REFRESH MATERIALIZED VIEW gold.vendas_temporais (
+  data DATE, dia_semana STRING, dia_semana_num INT, hora INT,
+  canal_venda STRING, total_vendas BIGINT, itens_vendidos BIGINT,
+  receita DECIMAL(10,2), clientes_unicos BIGINT
+)
+AS SELECT data, dia_semana, dia_semana_num, hora, canal_venda,
+  COUNT(*) AS total_vendas, SUM(quantidade) AS itens_vendidos,
+  CAST(SUM(receita) AS DECIMAL(10,2)) AS receita,
+  COUNT(DISTINCT id_cliente) AS clientes_unicos
+FROM silver.vendas GROUP BY ALL
+```
+
+### gold.vendas_produtos — Diretoria Comercial
+```sql
+CREATE OR REFRESH MATERIALIZED VIEW gold.vendas_produtos (
+  id_produto STRING, nome_produto STRING, categoria STRING, marca STRING,
+  total_vendas BIGINT, itens_vendidos BIGINT, receita DECIMAL(10,2),
+  ticket_medio DECIMAL(10,2), ranking_receita INT, ranking_na_categoria INT
+)
+AS SELECT v.id_produto,
+  COALESCE(p.nome_produto, 'Produto não cadastrado') AS nome_produto,
+  COUNT(*) AS total_vendas, SUM(v.quantidade) AS itens_vendidos,
+  CAST(SUM(v.receita) AS DECIMAL(10,2)) AS receita,
+  CAST(ROUND(AVG(v.receita), 2) AS DECIMAL(10,2)) AS ticket_medio,
+  ROW_NUMBER() OVER (ORDER BY CAST(SUM(v.receita) AS DECIMAL(10,2)) DESC) AS ranking_receita,
+  ROW_NUMBER() OVER (PARTITION BY COALESCE(p.categoria, 'Não cadastrado')
+    ORDER BY CAST(SUM(v.receita) AS DECIMAL(10,2)) DESC) AS ranking_na_categoria
+FROM silver.vendas v LEFT JOIN silver.produtos p ON v.id_produto = p.id_produto
+GROUP BY ALL
+```
+
+### gold.vendas_detalhadas — Cruzamento entre Diretorias
+```sql
+CREATE OR REFRESH MATERIALIZED VIEW gold.vendas_detalhadas
+CLUSTER BY (data)
+AS SELECT v.id_venda, v.data_venda, v.data, v.dia_semana, v.hora,
+  v.canal_venda, v.id_produto, COALESCE(p.nome_produto, 'Produto não cadastrado'),
+  v.id_cliente, c.nome_cliente, c.estado, c.regiao, cs.segmento_cliente,
+  v.quantidade, v.preco_unitario, v.receita, v.produto_cadastrado
+FROM silver.vendas v
+LEFT JOIN silver.produtos p ON v.id_produto = p.id_produto
+LEFT JOIN silver.clientes c ON v.id_cliente = c.id_cliente
+LEFT JOIN gold.clientes_segmentacao cs ON v.id_cliente = cs.id_cliente
+```
+
+### gold.clientes_segmentacao — Customer Success
+```sql
+CREATE OR REFRESH MATERIALIZED VIEW gold.clientes_segmentacao (
+  id_cliente STRING, nome_cliente STRING, estado STRING, nome_estado STRING,
+  regiao STRING, total_compras BIGINT, receita DECIMAL(10,2),
+  ticket_medio DECIMAL(10,2), segmento_cliente STRING, ranking_receita INT
+)
+AS WITH vendas_agg AS (
+  SELECT id_cliente, COUNT(*) AS total_compras, SUM(receita) AS receita,
+    MIN(data_venda) AS primeira_compra, MAX(data_venda) AS ultima_compra
+  FROM silver.vendas GROUP BY id_cliente
+)
+SELECT c.id_cliente, c.nome_cliente, c.estado, c.nome_estado, c.regiao,
+  COALESCE(v.total_compras, 0), CAST(COALESCE(v.receita, 0) AS DECIMAL(10,2)),
+  CASE WHEN COALESCE(v.receita, 0) >= 22000 THEN 'VIP'
+       WHEN COALESCE(v.receita, 0) >= 17000 THEN 'TOP_TIER'
+       ELSE 'REGULAR' END AS segmento_cliente,
+  ROW_NUMBER() OVER (ORDER BY COALESCE(v.receita, 0) DESC) AS ranking_receita
+FROM silver.clientes c LEFT JOIN vendas_agg v ON c.id_cliente = v.id_cliente
+```
+
+### gold.precos_competitividade — Pricing
+```sql
+CREATE OR REFRESH MATERIALIZED VIEW gold.precos_competitividade (
+  id_produto STRING, nome_produto STRING, nosso_preco DECIMAL(10,2),
+  preco_medio_concorrentes DECIMAL(10,2), preco_minimo_concorrentes DECIMAL(10,2),
+  classificacao_preco STRING, possui_preco_suspeito BOOLEAN, receita DECIMAL(10,2)
+)
+AS WITH concorrentes_agg AS (
+  SELECT id_produto, CAST(ROUND(AVG(preco_concorrente), 2) AS DECIMAL(10,2)),
+    CAST(MIN(preco_concorrente) AS DECIMAL(10,2)), CAST(MAX(preco_concorrente) AS DECIMAL(10,2)),
+    BOOL_OR(preco_suspeito) AS possui_preco_suspeito
+  FROM silver.preco_competidores GROUP BY id_produto
+)
+SELECT p.id_produto, p.nome_produto, CAST(p.preco_atual AS DECIMAL(10,2)),
+  CASE WHEN p.preco_atual > ca.preco_maximo_concorrentes THEN 'MAIS_CARO_QUE_TODOS'
+       WHEN p.preco_atual < ca.preco_minimo_concorrentes THEN 'MAIS_BARATO_QUE_TODOS'
+       WHEN p.preco_atual > ca.preco_medio_concorrentes THEN 'ACIMA_DA_MEDIA'
+       WHEN p.preco_atual < ca.preco_medio_concorrentes THEN 'ABAIXO_DA_MEDIA'
+       ELSE 'NA_MEDIA' END AS classificacao_preco
+FROM silver.produtos p INNER JOIN concorrentes_agg ca ON p.id_produto = ca.id_produto
+```
+
+---
+
+## 💬 Prompts Utilizados no Desenvolvimento
+
+O projeto foi desenvolvido com o auxílio do Databricks Assistant. Abaixo estão os 4 prompts principais que guiaram a construção de cada camada:
+
+### Prompt 1 — Camada Silver
+> "Crie as transformações da camada silver em Python (PySpark) usando Spark Declarative Pipelines. Para cada tabela bronze (vendas, clientes, produtos, preco_competidores), crie uma materialized view em silver que: remova duplicatas, converta valores monetários para DECIMAL(10,2), enriqueça os dados (mapeamento de UFs para regiões, faixa de preço, cálculo de receita, dia da semana em português) e adicione regras de qualidade @dp.expect_all_or_fail para campos obrigatórios e @dp.expect (warn) para problemas conhecidos como produto não cadastrado e preço suspeito. Nunca descarte linhas — marque problemas em colunas."
+
+### Prompt 2 — Gold da Diretoria de Customer Success
+> "Crie a materialized view gold.clientes_segmentacao em SQL que segmente todos os clientes por receita: VIP (>= R$ 22.000), TOP_TIER (R$ 17.000 a R$ 21.999,99) e REGULAR (< R$ 17.000). Inclua clientes sem compras (receita zero) usando LEFT JOIN a partir de silver.clientes. Adicione ranking de receita, ticket médio, primeira e última compra. Comente todas as colunas com tipo e descrição em português."
+
+### Prompt 3 — Gold da Diretoria Comercial
+> "Crie três materialized views em SQL para a Diretoria Comercial: (1) gold.vendas_temporais agregando vendas por data, hora, dia da semana e canal com COUNT, SUM e COUNT DISTINCT; (2) gold.vendas_produtos agregando por produto com ranking geral e por categoria usando ROW_NUMBER, incluindo vendas de produto não cadastrado com COALESCE; (3) gold.vendas_detalhadas no nível do pedido com JOIN entre vendas, produtos, clientes e segmentação, com CLUSTER BY (data). Todas com comentários em colunas e tipos explícitos."
+
+### Prompt 4 — Gold da Diretoria de Pricing
+> "Crie a materialized view gold.precos_competitividade em SQL que compare os preços da loja com os concorrentes (Mercado Livre, Amazon, Magalu, Shopee). Calcule preço médio, mínimo e máximo dos concorrentes, diferença percentual vs média e vs mínimo. Classifique cada produto: MAIS_CARO_QUE_TODOS, MAIS_BARATO_QUE_TODOS, ACIMA_DA_MEDIA, ABAIXO_DA_MEDIA, NA_MEDIA. Inclua flag de preço suspeito (concorrente com preço < 60% do nosso). Adicione receita e itens vendidos com LEFT JOIN em silver.vendas."
+
+---
+
 ## 📊 Tabelas Gold
 
 ### `gold.vendas_temporais`

@@ -261,7 +261,7 @@ w.jobs.run_now(job_id=116445174849570)
 
 **Eduardo R. J.**
 - Databricks Data Engineer
-- LinkedIn: [seu-linkedin]
+- LinkedIn: https://www.linkedin.com/in/eduardo-ramiro/
 - GitHub: [seu-github]
 
 ---

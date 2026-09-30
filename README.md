@@ -293,8 +293,8 @@ A IA foi tratada como uma **ferramenta de produtividade**, não como substituto 
 ## 👤 Autor
 
 **Eduardo R. J.**
-- Databricks Data Engineer
-- GitHub: [github.com/edurj07](https://github.com/edurj07)
+- Linkedin: https://www.linkedin.com/in/eduardo-ramiro/
+- GitHub: https://github.com/edurj07
 
 ---
 

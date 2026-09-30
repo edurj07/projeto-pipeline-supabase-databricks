@@ -2,7 +2,14 @@
 
 ## 📋 Visão Geral
 
-Plataforma de dados completa para e-commerce brasileiro construída no **Databricks Lakehouse**, cobrindo toda a jornada de dados desde a ingestão (Supabase/PostgreSQL) até dashboards executivos publicados para três diretorias. O projeto implementa uma arquitetura **medallion** (bronze → silver → gold) com pipeline declarativo Spark (SDP), testes automatizados de qualidade e republicação automática de dashboards AI/BI.
+Plataforma de dados completa para e-commerce brasileiro construída no **Databricks Lakehouse**, cobrindo toda a jornada de dados desde a ingestão de arquivos **Parquet** armazenados no **Supabase** (simulando uma conexão com **AWS S3**) até dashboards executivos publicados para três diretorias. O projeto implementa uma arquitetura **medallion** (bronze → silver → gold) com pipeline declarativo Spark (SDP), testes automatizados de qualidade e republicação automática de dashboards AI/BI.
+
+### 🔗 Sobre a Fonte de Dados (Simulação S3)
+
+Os dados originais (vendas, clientes, produtos e preços de concorrentes) estão em formato **Parquet** armazenados no **Supabase** (PostgreSQL). Esta configuração **simula o padrão de ingestão de dados do AWS S3** — um dos cenários mais comuns em arquiteturas Lakehouse corporativas — onde arquivos Parquet são lidos de um bucket de object storage e ingeridos na camada bronze do Databricks. O notebook auxiliar `conexão com S3.ipynb` documenta a configuração dessa conexão. Esta abordagem demonstra competência em:
+- **Leitura de arquivos Parquet** a partir de object storage
+- **Ingestão batch** com Auto Loader / `spark.read.parquet()`
+- **Padrão de arquitetura S3 → Bronze** amplamente utilizado em produção
 
 ### ✨ Destaques
 
@@ -20,9 +27,9 @@ Plataforma de dados completa para e-commerce brasileiro construída no **Databri
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        SUPABASE (PostgreSQL)                      │
-│                   Fonte: tabelas de vendas, clientes,             │
-│                   produtos e preços de concorrentes               │
+│                    SUPABASE (PostgreSQL)                          │
+│              Fonte: arquivos Parquet (simula AWS S3)              │
+│              vendas, clientes, produtos e concorrentes            │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                     ┌────────▼────────┐
@@ -54,7 +61,7 @@ Plataforma de dados completa para e-commerce brasileiro construída no **Databri
 
 | Camada | Catálogo | Schema | Tecnologia | Descrição |
 | --- | --- | --- | --- | --- |
-| Bronze | `projetovendas` | `bronze` | Tabelas Delta | Cópia bruta do Supabase |
+| Bronze | `projetovendas` | `bronze` | Tabelas Delta | Cópia bruta do Supabase (Parquet, padrão S3) |
 | Silver | `projetovendas` | `silver` | Materialized Views (Python) | Limpeza, enriquecimento e padronização |
 | Gold | `projetovendas` | `gold` | Materialized Views (SQL) | Agregações para análise de negócio |
 
@@ -206,7 +213,9 @@ projetovendas/
 | **AI/BI Dashboards (Lakeview)** | Dashboards executivos publicados |
 | **Databricks SDK (Python)** | Automação de refresh de dashboards |
 | **Declarative Automation Bundles** | Deploy e versionamento do pipeline |
-| **Supabase (PostgreSQL)** | Fonte de dados transacional |
+| **AWS S3 (simulado)** | Object storage — padrão de ingestão Parquet → Bronze |
+| **Parquet** | Formato de armazenamento colunar dos dados de origem |
+| **Supabase (PostgreSQL)** | Fonte de dados transacional (simula S3) |
 | **Python (PySpark)** | Transformações silver |
 | **SQL** | Transformações gold e queries de dashboards |
 | **Databricks Assistant (IA)** | Assistente de IA para desenvolvimento, debugging e automação |

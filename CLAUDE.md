@@ -33,6 +33,10 @@
 
 ## Genie Space: Diretoria E-commerce
 
+![Genie Space - Diretoria E-commerce](docs/images/genie_space_chat.png)
+
+> Print da tela inicial do Genie Space com as 6 perguntas de exemplo (2 por diretoria). O space atende os tres diretores: Comercial, Customer Success e Pricing.
+
 - Space ID: `01f1bd305a35162797249bd6197b1bda`.
 - Um único space atende os tres diretores: Comercial (vendas), Customer Success (clientes) e Pricing (precos da concorrencia: Mercado Livre, Amazon, Magalu e Shopee).
 - Warehouse: "Serverless Starter Warehouse".
